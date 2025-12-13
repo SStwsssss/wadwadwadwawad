@@ -1,0 +1,146 @@
+
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI_Library/main/UI_Template_1"))()
+local Window = Library.CreateLib("Smilley", "RJTheme3")
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local i = 0
+
+
+
+local Tab = Window:NewTab("Main")
+
+-- Подсекция
+local Section = Tab:NewSection("LocalPlayer")
+
+Section:NewButton("Esp Players", "Glowing Players", function()
+while wait(1) do
+for i , obj in pairs(game.Players:GetChildren()) do 
+if obj.Team.Name == "PATIENT" then
+local s = Instance.new("Highlight")
+local p = s:Clone()
+p.FillColor = Color3.fromRGB(0,0,0)
+p.OutlineColor = Color3.fromRGB(0,255,0)
+p.FillTransparency = 0.6
+p.Parent = obj.Character
+elseif obj.Team.Name == "ORDERLY" then
+local s = Instance.new("Highlight")
+local p = s:Clone()
+p.FillColor = Color3.fromRGB(0,0,0)
+p.OutlineColor = Color3.fromRGB(0,0,255)
+p.FillTransparency = 0.6
+p.Parent = obj.Character
+elseif obj.Team.Name == "MANAGEMENT" or obj.Team.Name == "MPT" then
+local s = Instance.new("Highlight")
+local p = s:Clone()
+p.FillColor = Color3.fromRGB(0,0,0)
+p.OutlineColor = Color3.fromRGB(255,0,0)
+p.FillTransparency = 0.6
+p.Parent = obj.Character
+elseif obj.Team.Name == "MEDICAL" then
+local s = Instance.new("Highlight")
+local p = s:Clone()
+p.FillColor = Color3.fromRGB(0,0,0)
+p.OutlineColor = Color3.fromRGB(0,0,255)
+p.FillTransparency = 0.6
+p.Parent = obj.Character
+end
+end
+end
+end)
+
+Section:NewButton("God Mode Beta", "Can Work on fire and other", function()
+for i , obj in pairs(player.Character:GetDescendants()) do 
+if obj:IsA("Part") then
+obj.CanTouch = false
+elseif obj:IsA("Model") then
+for i , obj2 in pairs(obj:GetDescendants()) do
+if obj2:IsA("Part") then
+obj2.CanTouch = false
+end
+end
+end
+end
+end)
+Section:NewButton("Escape", "Dont Spam Button", function()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local TargetCFrame = CFrame.new(4.6100049, 517.480042, 420.00824, -0.999899805, 9.62228075e-09, 0.0141575402, 1.00850706e-08, 1, 3.26171907e-08, -0.0141575402, 3.27566987e-08, -0.999899805)  -- ← ЗАМЕНИТЬ на нужный CFrame
+local UseSmoothFlight = false
+local FlightDuration = 60
+local function GetCharacterParts()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart")
+	local hum = char:WaitForChild("Humanoid")
+	return char, hrp, hum
+end
+local char, root, humanoid = GetCharacterParts()
+
+if UseSmoothFlight then
+	local startCFrame = root.CFrame
+	local startTime = tick()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local alpha = math.clamp((tick() - startTime) / FlightDuration, 0, 1)
+		if alpha >= 1 then
+			root.CFrame = TargetCFrame
+			if conn then conn:Disconnect(); conn = nil end
+			return
+		end
+		local pos = startCFrame.Position:Lerp(TargetCFrame.Position, alpha)
+		local look = TargetCFrame.LookVector
+		root.CFrame = CFrame.fromMatrix(pos, look, Vector3.new(0, 1, 0):Cross(look))
+	end)
+else
+	root.CFrame = TargetCFrame
+end
+end)
+
+Section:NewButton("Spills Clean Up", "", function()
+while wait(0.002) do
+	for i , obj in pairs(game.Workspace.Ignored.Spills:GetDescendants()) do
+		if obj.Name == "ProximityPrompt" then
+			obj.HoldDuration = 0
+			obj.MaxActivationDistance = 9999
+		end
+	end
+end
+end)
+
+Section:NewButton("Auto Escape", "Work Every 120 secoonds auto", function()
+while wait(110) do
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local TargetCFrame = CFrame.new(4.6100049, 517.480042, 420.00824, -0.999899805, 9.62228075e-09, 0.0141575402, 1.00850706e-08, 1, 3.26171907e-08, -0.0141575402, 3.27566987e-08, -0.999899805)  -- ← ЗАМЕНИТЬ на нужный CFrame
+local UseSmoothFlight = false
+local FlightDuration = 60
+local function GetCharacterParts()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart")
+	local hum = char:WaitForChild("Humanoid")
+	return char, hrp, hum
+end
+local char, root, humanoid = GetCharacterParts()
+
+if UseSmoothFlight then
+	local startCFrame = root.CFrame
+	local startTime = tick()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local alpha = math.clamp((tick() - startTime) / FlightDuration, 0, 1)
+		if alpha >= 1 then
+			root.CFrame = TargetCFrame
+			if conn then conn:Disconnect(); conn = nil end
+			return
+		end
+		local pos = startCFrame.Position:Lerp(TargetCFrame.Position, alpha)
+		local look = TargetCFrame.LookVector
+		root.CFrame = CFrame.fromMatrix(pos, look, Vector3.new(0, 1, 0):Cross(look))
+	end)
+else
+	root.CFrame = TargetCFrame
+end
+end
+end)
