@@ -13,40 +13,630 @@ local Tab = Window:NewTab("Main")
 -- Подсекция
 local Section = Tab:NewSection("LocalPlayer")
 
+Section:NewButton("Reset", "Glowing Players", function()
+player.Character.Humanoid.Health = 0
+end)
+
+Section:NewButton("Esp Presents", "Glowing Players", function()
+for i , obj in pairs(game.Workspace.ScavengerHunt:GetChildren()) do
+local p = Instance.new("Highlight")
+p.FillColor = Color3.fromRGB(255,0,0)
+p.OutlineColor = Color3.fromRGB(0,0,0)
+p.Parent = obj
+end
+end)
+
 Section:NewButton("Esp Players", "Glowing Players", function()
+-- ▼▼▼ LocalScript с Highlight и исправлениями ▼▼▼
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
+local LocalPlayer = Players.LocalPlayer
+
+-- === НАСТРОЙКИ (с учётом scale=2.5 → расширены лимиты) ===
+local config = {
+	enabled = true,
+	scale = 2.5,           -- ← вы хотели крупный
+	offsetY = 4.0,
+	showAvatar = true,
+	showAge = true,
+	showHealth = true,
+}
+
+local function loadConfig()
+	local saved = LocalPlayer:GetAttribute("BillboardConfig")
+	if type(saved) == "table" then
+		config.enabled = saved.enabled ~= nil and saved.enabled or config.enabled
+		config.scale = math.clamp(saved.scale or config.scale, 0.05, 3.0)   -- ← расширено!
+		config.offsetY = math.clamp(saved.offsetY or config.offsetY, 1.5, 10.0)
+		config.showAvatar = saved.showAvatar ~= nil and saved.showAvatar or config.showAvatar
+		config.showAge = saved.showAge ~= nil and saved.showAge or config.showAge
+		config.showHealth = saved.showHealth ~= nil and saved.showHealth or config.showHealth
+	end
+end
+
+local function saveConfig()
+	LocalPlayer:SetAttribute("BillboardConfig", config)
+end
+
+loadConfig()
+
+-- === ВСПОМОГАТЕЛЬНЫЕ ===
+local function getTeamColor(teamName)
+	if teamName == "PATIENT" then
+		return Color3.fromRGB(0, 255, 0)
+	elseif teamName == "ORDERLY" or teamName == "MEDICAL" then
+		return Color3.fromRGB(0, 0, 255)
+	elseif teamName == "MANAGEMENT" or teamName == "MPT" then
+		return Color3.fromRGB(255, 0, 0)
+	else
+		return nil
+	end
+end
+
+local function waitForUserId(plr)
+	if plr.UserId ~= 0 then return plr.UserId end
+	repeat
+		local ok, id = pcall(function() return plr.UserId end)
+		if ok and id ~= 0 then return id end
+		task.wait()
+	until false
+end
+
+-- === HIGHLIGHT ===
+local function applyHighlight(plr)
+	if not plr.Character then return end
+	local team = plr.Team
+	if not team then return end
+
+	local color = getTeamColor(team.Name)
+	if not color then return end
+
+	-- Удаляем старый, если есть
+	removeHighlight(plr)
+
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = color
+	highlight.FillTransparency = 0.3
+	highlight.OutlineColor = color
+	highlight.OutlineTransparency = 0.0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Enabled = true
+
+	-- Применяем ко всем BasePart в Character (кроме эффектов/хендлов)
+	for _, child in ipairs(plr.Character:GetDescendants()) do
+		if child:IsA("BasePart") and child.Name ~= "Handle" and child.Transparency < 1 then
+			highlight:AddInstance(child)
+		end
+	end
+
+	highlight.Parent = plr.Character
+	plr:SetAttribute("__Highlight", highlight)
+end
+
+local function removeHighlight(plr)
+	local highlight = plr:GetAttribute("__Highlight")
+	if highlight and highlight:IsDescendantOf(workspace) then
+		highlight:Destroy()
+	end
+	plr:SetAttribute("__Highlight", nil)
+end
+
+-- === BILLBOARD ===
+-- === BILLBOARD ===
+local function createOrRefreshBillboard(player)
+	if not config.enabled then return end
+	if not player.Character then return end
+	local character = player.Character
+	local head = character:FindFirstChild("Head")
+	if not head or not head:IsA("BasePart") then
+		if not character:FindFirstChild("__HeadWatcher") then
+			local tag = Instance.new("BoolValue")
+			tag.Name = "__HeadWatcher"
+			tag.Parent = character
+			character.ChildAdded:Connect(function(child)
+				if child.Name == "Head" and child:IsA("BasePart") then
+					task.delay(0.05, function()
+						if player.Parent then createOrRefreshBillboard(player) end
+					end)
+				end
+			end)
+		end
+		return
+	end
+
+	-- Удаляем старый
+	local old = head:FindFirstChild("TeamInfoBillboard")
+	if old then old:Destroy() end
+
+	local team = player.Team
+	if not team then return end
+
+	local teamColor = getTeamColor(team.Name)
+	if not teamColor then return end
+
+	-- === Основной BillboardGui ===
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "TeamInfoBillboard"
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.fromScale(config.scale, config.scale * 0.65)  -- чуть выше под текст
+	billboard.Adornee = head
+	billboard.ResetOnSpawn = false
+	billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	billboard.LightInfluence = 0
+	billboard.ExtentsOffsetWorldSpace = Vector3.new(0, config.offsetY, 0)
+	billboard.Parent = head
+
+	-- === Главный контейнер ===
+	local frame = Instance.new("Frame")
+	frame.Name = "MainFrame"
+	frame.BackgroundTransparency = 1
+	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.Parent = billboard
+
+	-- === Бэкграунд с градиентом (под стиль команды) ===
+	local bg = Instance.new("Frame")
+	bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	bg.BackgroundTransparency = 0.6
+	bg.BorderSizePixel = 0
+	bg.Size = UDim2.new(1, -4, 1, -4)
+	bg.Position = UDim2.new(0, 2, 0, 2)
+	bg.Parent = frame
+
+	-- === Акцентная полоса сверху (цвет команды) ===
+	local accentBar = Instance.new("Frame")
+	accentBar.BackgroundColor3 = teamColor
+	accentBar.BorderSizePixel = 0
+	accentBar.Size = UDim2.new(1, 0, 0, 3)
+	accentBar.Position = UDim2.new(0, 0, 0, 0)
+	accentBar.Parent = bg
+
+	-- === Аватар ===
+	local avatarSize = 0.26
+	local avatarSpacing = 0.03
+
+	if config.showAvatar then
+		local avatar = Instance.new("ImageLabel")
+		avatar.Name = "Avatar"
+		avatar.BackgroundTransparency = 1
+		avatar.ImageColor3 = Color3.fromRGB(255, 255, 255)
+		avatar.ImageTransparency = 0.05
+		avatar.Size = UDim2.fromScale(avatarSize, avatarSize)
+		avatar.Position = UDim2.fromScale(avatarSpacing, avatarSpacing + 0.03)
+		-- Рамка-обводка
+		local avatarBorder = Instance.new("ImageLabel")
+		avatarBorder.BackgroundTransparency = 1
+		avatarBorder.Image = "rbxassetid://3570911312" -- круглая маска
+		avatarBorder.ImageColor3 = teamColor
+		avatarBorder.Size = avatar.Size
+		avatarBorder.Position = avatar.Position
+		avatarBorder.Parent = bg
+		avatar.Parent = bg
+
+		task.spawn(function()
+			local userId = waitForUserId(player)
+			-- ✅ УБРАНЫ ПРОБЕЛЫ → исправлен 404
+			avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
+		end)
+	end
+
+	-- === Позиция для текста (справа от аватара) ===
+	local textXStart = config.showAvatar and (avatarSize + avatarSpacing * 2) or avatarSpacing
+	local textWidth = 1 - textXStart - avatarSpacing
+
+	-- === Никнейм ===
+	local nickname = Instance.new("TextLabel")
+	nickname.Name = "Nickname"
+	nickname.BackgroundTransparency = 1
+	nickname.Size = UDim2.fromScale(textWidth, 0.24)
+	nickname.Position = UDim2.fromScale(textXStart, 0.07)
+	nickname.Text = player.DisplayName ~= "" and (player.DisplayName .. " (@ " .. player.Name .. ")") or ("@ " .. player.Name)
+	nickname.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nickname.TextSize = 18
+	nickname.TextScaled = true
+	nickname.Font = Enum.Font.GothamBold
+	nickname.TextXAlignment = Enum.TextXAlignment.Left
+	nickname.TextYAlignment = Enum.TextYAlignment.Top
+	nickname.TextWrapped = true
+	nickname.TextTruncate = Enum.TextTruncate.AtEnd
+	nickname.Parent = bg
+
+	-- === Информация об аккаунте ===
+	local infoLines = {}
+	table.insert(infoLines, "Создан: " .. os.date("%d.%m.%Y", os.time() - player.AccountAge * 86400))
+	if config.showAge then
+		table.insert(infoLines, "Возраст: " .. player.AccountAge .. " дн.")
+	end
+
+	local infoText = Instance.new("TextLabel")
+	infoText.Name = "AccountInfo"
+	infoText.BackgroundTransparency = 1
+	infoText.Size = UDim2.fromScale(textWidth, 0.28)
+	infoText.Position = UDim2.fromScale(textXStart, 0.31)
+	infoText.Text = table.concat(infoLines, "\n")
+	infoText.TextColor3 = Color3.fromRGB(200, 200, 200)
+	infoText.TextSize = 14
+	infoText.TextScaled = true
+	infoText.Font = Enum.Font.Gotham
+	infoText.TextWrapped = true
+	infoText.TextXAlignment = Enum.TextXAlignment.Left
+	infoText.TextYAlignment = Enum.TextYAlignment.Top
+	infoText.Parent = bg
+
+	-- === Полоса здоровья ===
+	if config.showHealth then
+		local healthBarY = 0.62
+		local healthBarHeight = 0.055
+
+		local healthBarBg = Instance.new("Frame")
+		healthBarBg.Name = "HealthBarBg"
+		healthBarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		healthBarBg.BorderSizePixel = 0
+		healthBarBg.Size = UDim2.fromScale(textWidth, healthBarHeight)
+		healthBarBg.Position = UDim2.fromScale(textXStart, healthBarY)
+		healthBarBg.ClipsDescendants = true
+		healthBarBg.Parent = bg
+
+		local healthBarFill = Instance.new("Frame")
+		healthBarFill.Name = "HealthBarFill"
+		healthBarFill.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		healthBarFill.BorderSizePixel = 0
+		healthBarFill.Size = UDim2.fromScale(1, 1)
+		healthBarFill.Parent = healthBarBg
+
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local function setupHealth(hmn)
+			local function update()
+				if not hmn or not hmn.Parent then return end
+				local maxHealth = hmn.MaxHealth > 0 and hmn.MaxHealth or 1
+				local ratio = math.clamp(hmn.Health / maxHealth, 0, 1)
+				healthBarFill:TweenSize(UDim2.fromScale(ratio, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+
+				-- Цвета динамические
+				if ratio > 0.6 then
+					healthBarFill.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+				elseif ratio > 0.3 then
+					healthBarFill.BackgroundColor3 = Color3.fromRGB(220, 200, 40)
+				else
+					healthBarFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+				end
+			end
+			hmn.HealthChanged:Connect(update)
+			hmn.MaxHealthChanged:Connect(update)
+			update()
+		end
+
+		if humanoid then
+			setupHealth(humanoid)
+		else
+			local conn
+			conn = character.ChildAdded:Connect(function(child)
+				if child:IsA("Humanoid") then
+					conn:Disconnect()
+					setupHealth(child)
+				end
+			end)
+		end
+	end
+end
+
+-- Применить всё
+local function refreshPlayer(plr)
+	if not plr.Character then return end
+	if config.enabled then
+		createOrRefreshBillboard(plr)
+	end
+	applyHighlight(plr)
+end
+
+local function refreshAll()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			refreshPlayer(plr)
+		end
+	end
+end
+
+-- === МЕНЮ УПРАВЛЕНИЯ (без изменений, кроме scale range) ===
+local menu = nil
+local menuVisible = false
+local idleTimer = nil
+
+local function hideMenu()
+	if menu then menu:Destroy() end
+	menu = nil
+	menuVisible = false
+end
+
+local function resetIdleTimer()
+	if idleTimer then task.cancel(idleTimer) end
+	idleTimer = task.delay(8, hideMenu)
+end
+
+local function createMenu()
+	if menu then menu:Destroy() end
+
+	menu = Instance.new("ScreenGui")
+	menu.Name = "BillboardMenu"
+	menu.ResetOnSpawn = false
+	menu.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	menu.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+	local bg = Instance.new("Frame")
+	bg.Name = "Background"
+	bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	bg.BorderColor3 = Color3.fromRGB(80, 80, 80)
+	bg.BorderSizePixel = 1
+	bg.Size = UDim2.fromScale(0.22, 0.4)
+	bg.Position = UDim2.fromScale(0.01, 0.02)
+	bg.Parent = menu
+
+	local title = Instance.new("TextLabel")
+	title.Text = "Billboard Настройки"
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextSize = 16
+	title.Font = Enum.Font.GothamBold
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 0.08)
+	title.Position = UDim2.fromScale(0, 0)
+	title.Parent = bg
+
+	local toggleEnabled = Instance.new("TextButton")
+	toggleEnabled.Text = config.enabled and "✅ ВКЛ" or "❌ ВЫКЛ"
+	toggleEnabled.TextColor3 = Color3.fromRGB(255, 255, 255)
+	toggleEnabled.BackgroundColor3 = config.enabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+	toggleEnabled.Size = UDim2.fromScale(0.96, 0.08)
+	toggleEnabled.Position = UDim2.fromScale(0.02, 0.10)
+	toggleEnabled.Parent = bg
+	toggleEnabled.MouseButton1Click:Connect(function()
+		config.enabled = not config.enabled
+		toggleEnabled.Text = config.enabled and "✅ ВКЛ" or "❌ ВЫКЛ"
+		toggleEnabled.BackgroundColor3 = config.enabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+		saveConfig()
+		refreshAll()
+		resetIdleTimer()
+	end)
+
+	local scaleLabel = Instance.new("TextLabel")
+	scaleLabel.Text = "Масштаб: " .. string.format("%.2f", config.scale)
+	scaleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	scaleLabel.BackgroundTransparency = 1
+	scaleLabel.Size = UDim2.fromScale(0.96, 0.06)
+	scaleLabel.Position = UDim2.fromScale(0.02, 0.20)
+	scaleLabel.Parent = bg
+
+	local scaleDown = Instance.new("TextButton")
+	scaleDown.Text = "◄"
+	scaleDown.Size = UDim2.fromScale(0.1, 0.06)
+	scaleDown.Position = UDim2.fromScale(0.78, 0.28)
+	scaleDown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	scaleDown.TextColor3 = Color3.fromRGB(200, 200, 200)
+	scaleDown.Parent = bg
+	scaleDown.MouseButton1Click:Connect(function()
+		config.scale = math.clamp(config.scale - 0.05, 0.05, 3.0)  -- ← шаг 0.05 для крупных значений
+		scaleLabel.Text = "Масштаб: " .. string.format("%.2f", config.scale)
+		saveConfig()
+		refreshAll()
+		resetIdleTimer()
+	end)
+
+	local scaleUp = Instance.new("TextButton")
+	scaleUp.Text = "►"
+	scaleUp.Size = UDim2.fromScale(0.1, 0.06)
+	scaleUp.Position = UDim2.fromScale(0.88, 0.28)
+	scaleUp.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	scaleUp.TextColor3 = Color3.fromRGB(200, 200, 200)
+	scaleUp.Parent = bg
+	scaleUp.MouseButton1Click:Connect(function()
+		config.scale = math.clamp(config.scale + 0.05, 0.05, 3.0)
+		scaleLabel.Text = "Масштаб: " .. string.format("%.2f", config.scale)
+		saveConfig()
+		refreshAll()
+		resetIdleTimer()
+	end)
+
+	local heightLabel = Instance.new("TextLabel")
+	heightLabel.Text = "Высота: " .. string.format("%.1f", config.offsetY)
+	heightLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	heightLabel.BackgroundTransparency = 1
+	heightLabel.Size = UDim2.fromScale(0.96, 0.06)
+	heightLabel.Position = UDim2.fromScale(0.02, 0.30)
+	heightLabel.Parent = bg
+
+	local heightDown = Instance.new("TextButton")
+	heightDown.Text = "▼"
+	heightDown.Size = UDim2.fromScale(0.1, 0.06)
+	heightDown.Position = UDim2.fromScale(0.78, 0.38)
+	heightDown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	heightDown.TextColor3 = Color3.fromRGB(200, 200, 200)
+	heightDown.Parent = bg
+	heightDown.MouseButton1Click:Connect(function()
+		config.offsetY = math.clamp(config.offsetY - 0.2, 1.5, 10.0)
+		heightLabel.Text = "Высота: " .. string.format("%.1f", config.offsetY)
+		saveConfig()
+		refreshAll()
+		resetIdleTimer()
+	end)
+
+	local heightUp = Instance.new("TextButton")
+	heightUp.Text = "▲"
+	heightUp.Size = UDim2.fromScale(0.1, 0.06)
+	heightUp.Position = UDim2.fromScale(0.88, 0.38)
+	heightUp.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	heightUp.TextColor3 = Color3.fromRGB(200, 200, 200)
+	heightUp.Parent = bg
+	heightUp.MouseButton1Click:Connect(function()
+		config.offsetY = math.clamp(config.offsetY + 0.2, 1.5, 10.0)
+		heightLabel.Text = "Высота: " .. string.format("%.1f", config.offsetY)
+		saveConfig()
+		refreshAll()
+		resetIdleTimer()
+	end)
+
+	local function makeToggle(label, y, getFn, setFn)
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.fromScale(0.96, 0.07)
+		frame.Position = UDim2.fromScale(0.02, y)
+		frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+		frame.Parent = bg
+
+		local text = Instance.new("TextLabel")
+		text.Text = label
+		text.Size = UDim2.fromScale(0.75, 1)
+		text.Position = UDim2.fromScale(0, 0)
+		text.BackgroundTransparency = 1
+		text.TextColor3 = Color3.fromRGB(220, 220, 220)
+		text.TextXAlignment = Enum.TextXAlignment.Left
+		text.Parent = frame
+
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.fromScale(0.25, 1)
+		btn.Position = UDim2.fromScale(0.75, 0)
+		btn.BackgroundColor3 = getFn() and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+		btn.Text = getFn() and "Да" or "Нет"
+		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		btn.Parent = frame
+		btn.MouseButton1Click:Connect(function()
+			local newVal = not getFn()
+			setFn(newVal)
+			btn.BackgroundColor3 = newVal and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+			btn.Text = newVal and "Да" or "Нет"
+			saveConfig()
+			refreshAll()
+			resetIdleTimer()
+		end)
+		return frame
+	end
+
+	makeToggle("Avatar", 0.42, function() return config.showAvatar end, function(v) config.showAvatar = v end)
+	makeToggle("Age", 0.50, function() return config.showAge end, function(v) config.showAge = v end)
+	makeToggle("Health", 0.58, function() return config.showHealth end, function(v) config.showHealth = v end)
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Text = "× Close"
+	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	closeBtn.Size = UDim2.fromScale(0.25, 0.07)
+	closeBtn.Position = UDim2.fromScale(0.73, 0.91)
+	closeBtn.Parent = bg
+	closeBtn.MouseButton1Click:Connect(hideMenu)
+
+	resetIdleTimer()
+	menuVisible = true
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.U then
+		if menuVisible then
+			hideMenu()
+		else
+			createMenu()
+		end
+	end
+end)
+
+-- === ПОДПИСКИ ===
+local function onPlayerAdded(plr)
+	local function onCharacterAdded(char)
+		task.delay(0.1, function()
+			if plr.Parent then refreshPlayer(plr) end
+		end)
+	end
+
+	local function onTeamChanged()
+		task.delay(0.05, function()
+			if plr.Parent and plr.Character then refreshPlayer(plr) end
+		end)
+	end
+
+	plr.CharacterAdded:Connect(onCharacterAdded)
+	plr:GetPropertyChangedSignal("Team"):Connect(onTeamChanged)
+	plr.CharacterRemoving:Connect(function() removeHighlight(plr) end)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(removeHighlight)
+
+-- Для уже существующих
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr ~= LocalPlayer then
+		onPlayerAdded(plr)
+		if plr.Character then
+			task.delay(0.1, function() if plr.Parent then refreshPlayer(plr) end end)
+		end
+	end
+end
+
+-- Резерв
+task.spawn(function()
+	while task.wait(3) do
+		if config.enabled then
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if plr ~= LocalPlayer and plr.Character and plr.Team then
+					refreshPlayer(plr)
+				end
+			end
+		end
+	end
+end)
+
+
 while wait(1) do
-for i , obj in pairs(game.Players:GetChildren()) do 
-if obj.Team.Name == "PATIENT" then
-local s = Instance.new("Highlight")
-local p = s:Clone()
-p.FillColor = Color3.fromRGB(0,0,0)
-p.OutlineColor = Color3.fromRGB(0,255,0)
-p.FillTransparency = 0.6
-p.Parent = obj.Character
-elseif obj.Team.Name == "ORDERLY" then
-local s = Instance.new("Highlight")
-local p = s:Clone()
-p.FillColor = Color3.fromRGB(0,0,0)
-p.OutlineColor = Color3.fromRGB(0,0,255)
-p.FillTransparency = 0.6
-p.Parent = obj.Character
-elseif obj.Team.Name == "MANAGEMENT" or obj.Team.Name == "MPT" then
-local s = Instance.new("Highlight")
-local p = s:Clone()
-p.FillColor = Color3.fromRGB(0,0,0)
-p.OutlineColor = Color3.fromRGB(255,0,0)
-p.FillTransparency = 0.6
-p.Parent = obj.Character
-elseif obj.Team.Name == "MEDICAL" then
-local s = Instance.new("Highlight")
-local p = s:Clone()
-p.FillColor = Color3.fromRGB(0,0,0)
-p.OutlineColor = Color3.fromRGB(0,0,255)
-p.FillTransparency = 0.6
-p.Parent = obj.Character
+	for i, obj in pairs(game.Players:GetChildren()) do
+		if obj:IsA("Player") and obj.Team then
+			local teamName = obj.Team.Name
+			local outlineColor
+
+			-- Определяем цвет по команде
+			if teamName == "PATIENT" then
+				outlineColor = Color3.fromRGB(0, 255, 0)
+			elseif teamName == "ORDERLY" or teamName == "MEDICAL" then
+				outlineColor = Color3.fromRGB(0, 0, 255)
+			elseif teamName == "MANAGEMENT" or teamName == "MPT" then
+				outlineColor = Color3.fromRGB(255, 0, 0)
+			else
+				outlineColor = nil
+			end
+
+			if outlineColor then
+				-- Получаем Character (даже если игрок мёртв — пробуем найти)
+				local char = obj.Character or obj:FindFirstChild("Character")
+
+				-- 🔥 КЛЮЧЕВОЕ: если Character нет — ждём появления (но только 1 раз за итерацию)
+				if not char then
+					-- Подписываемся на CharacterAdded ОДИН РАЗ, чтобы не спамить
+					if not obj:FindFirstChild("__HighlightWatcher") then
+						local tag = Instance.new("BoolValue")
+						tag.Name = "__HighlightWatcher"
+						tag.Parent = obj
+
+						obj.CharacterAdded:Connect(function(newChar)
+							-- После появления — сразу обновим вручную в следующем цикле
+						end)
+					end
+					continue  -- пропускаем, Character ещё не готов
+				end
+
+				-- Удаляем старые Highlight’ы (чтобы не множились)
+				for _, child in ipairs(char:GetChildren()) do
+					if child:IsA("Highlight") and child.Name == "TeamHighlight" then
+						child:Destroy()
+					end
+				end
+
+				-- Создаём НОВЫЙ Highlight — КАК У ВАС, НО БЕЗ s:Clone() (Clone пустого — бессмысленно)
+				local p = Instance.new("Highlight")
+				p.Name = "TeamHighlight"  -- имя для поиска/удаления
+				p.FillColor = Color3.fromRGB(0, 0, 0)
+				p.OutlineColor = outlineColor
+				p.FillTransparency = 0.6
+				p.Parent = char  -- как вы хотели — в Character
+			end
+		end
+	end
 end
-end
-end
+
 end)
 
 Section:NewButton("God Mode Beta", "Can Work on fire and other", function()
@@ -68,7 +658,7 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local TargetCFrame = CFrame.new(4.6100049, 517.480042, 420.00824, -0.999899805, 9.62228075e-09, 0.0141575402, 1.00850706e-08, 1, 3.26171907e-08, -0.0141575402, 3.27566987e-08, -0.999899805)  -- ← ЗАМЕНИТЬ на нужный CFrame
 local UseSmoothFlight = false
-local FlightDuration = 60
+local FlightDuration = 9999
 local function GetCharacterParts()
 	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local hrp = char:WaitForChild("HumanoidRootPart")
@@ -97,19 +687,32 @@ else
 end
 end)
 
-Section:NewButton("Spills Clean Up", "", function()
+Section:NewButton("Spills Clean Up", "remove spill cleaning process", function()
 while wait(0.002) do
-	for i , obj in pairs(game.Workspace.Ignored.Spills:GetDescendants()) do
+	for i , obj in pairs(game.Workspace:GetDescendants()) do
 		if obj.Name == "ProximityPrompt" then
 			obj.HoldDuration = 0
-			obj.MaxActivationDistance = 9999
 		end
+	end
+end
+end)
+
+Section:NewButton("Fast Interact", "Can fast open doors . heal peoples", function()
+while wait(0.001) do
+	for _, obj in ipairs(game.Workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			obj.HoldDuration = 0
+			wait(0.001)
+		end
+		
 	end
 end
 end)
 
 Section:NewButton("Auto Escape", "Work Every 120 secoonds auto", function()
 while wait(110) do
+local i = 0 
+for i = 0 , 3 do
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -142,5 +745,7 @@ if UseSmoothFlight then
 else
 	root.CFrame = TargetCFrame
 end
+end
+wait(1)
 end
 end)
