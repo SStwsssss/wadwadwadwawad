@@ -13,6 +13,38 @@ local Tab = Window:NewTab("Main")
 -- Подсекция
 local Section = Tab:NewSection("LocalPlayer")
 
+Section:NewToggle("SpeedHack", "God Mode (Noclip)", function(state)
+    if state then
+if game.Workspace:FindFirstChild("SSS") then
+local RunService = game:GetService("RunService")
+RunService.RenderStepped:Connect(function()
+if game.Workspace:FindFirstChild("SSS") then
+character.Humanoid.WalkSpeed = 50
+print("ON")
+end
+end)
+else
+local d = Instance.new("Part")
+print("add")
+d.Name = "SSS"
+d.Parent = game.Workspace
+wait(0.01)
+
+local RunService = game:GetService("RunService")
+RunService.RenderStepped:Connect(function()
+if game.Workspace:FindFirstChild("SSS") then
+character.Humanoid.WalkSpeed = 50
+print("ON")
+end
+end)
+end
+    else
+game.Workspace.SSS:Destroy()
+print("off")
+end
+end)
+
+
 Section:NewButton("Reset", "Glowing Players", function()
 player.Character.Humanoid.Health = 0
 end)
@@ -27,16 +59,15 @@ end
 end)
 
 Section:NewButton("Esp Players", "Glowing Players", function()
--- ▼▼▼ LocalScript с Highlight и исправлениями ▼▼▼
+-- ▼▼▼ LocalScript: Billboard + Highlight + Dynamic Team-Themed Menu ▼▼▼
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local CollectionService = game:GetService("CollectionService")
 local LocalPlayer = Players.LocalPlayer
 
--- === НАСТРОЙКИ (с учётом scale=2.5 → расширены лимиты) ===
+-- === НАСТРОЙКИ ===
 local config = {
 	enabled = true,
-	scale = 2.5,           -- ← вы хотели крупный
+	scale = 2.5,
 	offsetY = 4.0,
 	showAvatar = true,
 	showAge = true,
@@ -47,7 +78,7 @@ local function loadConfig()
 	local saved = LocalPlayer:GetAttribute("BillboardConfig")
 	if type(saved) == "table" then
 		config.enabled = saved.enabled ~= nil and saved.enabled or config.enabled
-		config.scale = math.clamp(saved.scale or config.scale, 0.05, 3.0)   -- ← расширено!
+		config.scale = math.clamp(saved.scale or config.scale, 0.05, 3.0)
 		config.offsetY = math.clamp(saved.offsetY or config.offsetY, 1.5, 10.0)
 		config.showAvatar = saved.showAvatar ~= nil and saved.showAvatar or config.showAvatar
 		config.showAge = saved.showAge ~= nil and saved.showAge or config.showAge
@@ -70,7 +101,7 @@ local function getTeamColor(teamName)
 	elseif teamName == "MANAGEMENT" or teamName == "MPT" then
 		return Color3.fromRGB(255, 0, 0)
 	else
-		return nil
+		return Color3.fromRGB(255, 255, 255) -- fallback белый
 	end
 end
 
@@ -92,7 +123,6 @@ local function applyHighlight(plr)
 	local color = getTeamColor(team.Name)
 	if not color then return end
 
-	-- Удаляем старый, если есть
 	removeHighlight(plr)
 
 	local highlight = Instance.new("Highlight")
@@ -103,7 +133,6 @@ local function applyHighlight(plr)
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Enabled = true
 
-	-- Применяем ко всем BasePart в Character (кроме эффектов/хендлов)
 	for _, child in ipairs(plr.Character:GetDescendants()) do
 		if child:IsA("BasePart") and child.Name ~= "Handle" and child.Transparency < 1 then
 			highlight:AddInstance(child)
@@ -122,7 +151,6 @@ local function removeHighlight(plr)
 	plr:SetAttribute("__Highlight", nil)
 end
 
--- === BILLBOARD ===
 -- === BILLBOARD ===
 local function createOrRefreshBillboard(player)
 	if not config.enabled then return end
@@ -145,7 +173,6 @@ local function createOrRefreshBillboard(player)
 		return
 	end
 
-	-- Удаляем старый
 	local old = head:FindFirstChild("TeamInfoBillboard")
 	if old then old:Destroy() end
 
@@ -155,11 +182,10 @@ local function createOrRefreshBillboard(player)
 	local teamColor = getTeamColor(team.Name)
 	if not teamColor then return end
 
-	-- === Основной BillboardGui ===
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TeamInfoBillboard"
 	billboard.AlwaysOnTop = true
-	billboard.Size = UDim2.fromScale(config.scale, config.scale * 0.65)  -- чуть выше под текст
+	billboard.Size = UDim2.fromScale(config.scale, config.scale * 0.65)
 	billboard.Adornee = head
 	billboard.ResetOnSpawn = false
 	billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -167,14 +193,12 @@ local function createOrRefreshBillboard(player)
 	billboard.ExtentsOffsetWorldSpace = Vector3.new(0, config.offsetY, 0)
 	billboard.Parent = head
 
-	-- === Главный контейнер ===
 	local frame = Instance.new("Frame")
 	frame.Name = "MainFrame"
 	frame.BackgroundTransparency = 1
 	frame.Size = UDim2.new(1, 0, 1, 0)
 	frame.Parent = billboard
 
-	-- === Бэкграунд с градиентом (под стиль команды) ===
 	local bg = Instance.new("Frame")
 	bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 	bg.BackgroundTransparency = 0.6
@@ -183,7 +207,6 @@ local function createOrRefreshBillboard(player)
 	bg.Position = UDim2.new(0, 2, 0, 2)
 	bg.Parent = frame
 
-	-- === Акцентная полоса сверху (цвет команды) ===
 	local accentBar = Instance.new("Frame")
 	accentBar.BackgroundColor3 = teamColor
 	accentBar.BorderSizePixel = 0
@@ -191,7 +214,6 @@ local function createOrRefreshBillboard(player)
 	accentBar.Position = UDim2.new(0, 0, 0, 0)
 	accentBar.Parent = bg
 
-	-- === Аватар ===
 	local avatarSize = 0.26
 	local avatarSpacing = 0.03
 
@@ -203,10 +225,10 @@ local function createOrRefreshBillboard(player)
 		avatar.ImageTransparency = 0.05
 		avatar.Size = UDim2.fromScale(avatarSize, avatarSize)
 		avatar.Position = UDim2.fromScale(avatarSpacing, avatarSpacing + 0.03)
-		-- Рамка-обводка
+
 		local avatarBorder = Instance.new("ImageLabel")
 		avatarBorder.BackgroundTransparency = 1
-		avatarBorder.Image = "rbxassetid://3570911312" -- круглая маска
+		avatarBorder.Image = "rbxassetid://3570911312"
 		avatarBorder.ImageColor3 = teamColor
 		avatarBorder.Size = avatar.Size
 		avatarBorder.Position = avatar.Position
@@ -215,16 +237,13 @@ local function createOrRefreshBillboard(player)
 
 		task.spawn(function()
 			local userId = waitForUserId(player)
-			-- ✅ УБРАНЫ ПРОБЕЛЫ → исправлен 404
 			avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
 		end)
 	end
 
-	-- === Позиция для текста (справа от аватара) ===
 	local textXStart = config.showAvatar and (avatarSize + avatarSpacing * 2) or avatarSpacing
 	local textWidth = 1 - textXStart - avatarSpacing
 
-	-- === Никнейм ===
 	local nickname = Instance.new("TextLabel")
 	nickname.Name = "Nickname"
 	nickname.BackgroundTransparency = 1
@@ -241,7 +260,6 @@ local function createOrRefreshBillboard(player)
 	nickname.TextTruncate = Enum.TextTruncate.AtEnd
 	nickname.Parent = bg
 
-	-- === Информация об аккаунте ===
 	local infoLines = {}
 	table.insert(infoLines, "Создан: " .. os.date("%d.%m.%Y", os.time() - player.AccountAge * 86400))
 	if config.showAge then
@@ -263,7 +281,6 @@ local function createOrRefreshBillboard(player)
 	infoText.TextYAlignment = Enum.TextYAlignment.Top
 	infoText.Parent = bg
 
-	-- === Полоса здоровья ===
 	if config.showHealth then
 		local healthBarY = 0.62
 		local healthBarHeight = 0.055
@@ -292,7 +309,6 @@ local function createOrRefreshBillboard(player)
 				local ratio = math.clamp(hmn.Health / maxHealth, 0, 1)
 				healthBarFill:TweenSize(UDim2.fromScale(ratio, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
 
-				-- Цвета динамические
 				if ratio > 0.6 then
 					healthBarFill.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
 				elseif ratio > 0.3 then
@@ -320,7 +336,6 @@ local function createOrRefreshBillboard(player)
 	end
 end
 
--- Применить всё
 local function refreshPlayer(plr)
 	if not plr.Character then return end
 	if config.enabled then
@@ -337,10 +352,28 @@ local function refreshAll()
 	end
 end
 
--- === МЕНЮ УПРАВЛЕНИЯ (без изменений, кроме scale range) ===
+-- === МЕНЮ УПРАВЛЕНИЯ (ПОЛНОСТЬЮ ОБНОВЛЁННОЕ) ===
 local menu = nil
 local menuVisible = false
 local idleTimer = nil
+
+local function updateMenuTheme()
+	if not menu or not menu.Parent then return end
+	local bg = menu:FindFirstChild("Background")
+	if not bg then return end
+
+	local teamColor = getTeamColor(LocalPlayer.Team and LocalPlayer.Team.Name or "")
+	bg.BorderColor3 = teamColor
+
+	-- Обновляем все TextLabel и TextButton.TextColor3
+	for _, obj in ipairs(bg:GetDescendants()) do
+		if obj:IsA("TextLabel") or (obj:IsA("TextButton") and obj.Name ~= "CloseButton") then
+			if obj.Name ~= "HealthBarFill" and obj.Parent ~= nil then
+				obj.TextColor3 = teamColor
+			end
+		end
+	end
+end
 
 local function hideMenu()
 	if menu then menu:Destroy() end
@@ -354,7 +387,7 @@ local function resetIdleTimer()
 end
 
 local function createMenu()
-	if menu then menu:Destroy() end
+	hideMenu()
 
 	menu = Instance.new("ScreenGui")
 	menu.Name = "BillboardMenu"
@@ -364,16 +397,23 @@ local function createMenu()
 
 	local bg = Instance.new("Frame")
 	bg.Name = "Background"
-	bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-	bg.BorderColor3 = Color3.fromRGB(80, 80, 80)
+	bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)  -- ✅ Чёрный
 	bg.BorderSizePixel = 1
 	bg.Size = UDim2.fromScale(0.22, 0.4)
 	bg.Position = UDim2.fromScale(0.01, 0.02)
 	bg.Parent = menu
 
+	-- ✅ Скруглённые углы
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = bg
+
+	-- Инициализируем тему
+	updateMenuTheme()
+
 	local title = Instance.new("TextLabel")
+	title.Name = "Title"
 	title.Text = "Billboard Настройки"
-	title.TextColor3 = Color3.fromRGB(255, 255, 255)
 	title.TextSize = 16
 	title.Font = Enum.Font.GothamBold
 	title.BackgroundTransparency = 1
@@ -383,7 +423,6 @@ local function createMenu()
 
 	local toggleEnabled = Instance.new("TextButton")
 	toggleEnabled.Text = config.enabled and "✅ ВКЛ" or "❌ ВЫКЛ"
-	toggleEnabled.TextColor3 = Color3.fromRGB(255, 255, 255)
 	toggleEnabled.BackgroundColor3 = config.enabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
 	toggleEnabled.Size = UDim2.fromScale(0.96, 0.08)
 	toggleEnabled.Position = UDim2.fromScale(0.02, 0.10)
@@ -398,8 +437,8 @@ local function createMenu()
 	end)
 
 	local scaleLabel = Instance.new("TextLabel")
+	scaleLabel.Name = "ScaleLabel"
 	scaleLabel.Text = "Масштаб: " .. string.format("%.2f", config.scale)
-	scaleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 	scaleLabel.BackgroundTransparency = 1
 	scaleLabel.Size = UDim2.fromScale(0.96, 0.06)
 	scaleLabel.Position = UDim2.fromScale(0.02, 0.20)
@@ -410,10 +449,9 @@ local function createMenu()
 	scaleDown.Size = UDim2.fromScale(0.1, 0.06)
 	scaleDown.Position = UDim2.fromScale(0.78, 0.28)
 	scaleDown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	scaleDown.TextColor3 = Color3.fromRGB(200, 200, 200)
 	scaleDown.Parent = bg
 	scaleDown.MouseButton1Click:Connect(function()
-		config.scale = math.clamp(config.scale - 0.05, 0.05, 3.0)  -- ← шаг 0.05 для крупных значений
+		config.scale = math.clamp(config.scale - 0.05, 0.05, 3.0)
 		scaleLabel.Text = "Масштаб: " .. string.format("%.2f", config.scale)
 		saveConfig()
 		refreshAll()
@@ -425,7 +463,6 @@ local function createMenu()
 	scaleUp.Size = UDim2.fromScale(0.1, 0.06)
 	scaleUp.Position = UDim2.fromScale(0.88, 0.28)
 	scaleUp.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	scaleUp.TextColor3 = Color3.fromRGB(200, 200, 200)
 	scaleUp.Parent = bg
 	scaleUp.MouseButton1Click:Connect(function()
 		config.scale = math.clamp(config.scale + 0.05, 0.05, 3.0)
@@ -436,8 +473,8 @@ local function createMenu()
 	end)
 
 	local heightLabel = Instance.new("TextLabel")
+	heightLabel.Name = "HeightLabel"
 	heightLabel.Text = "Высота: " .. string.format("%.1f", config.offsetY)
-	heightLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 	heightLabel.BackgroundTransparency = 1
 	heightLabel.Size = UDim2.fromScale(0.96, 0.06)
 	heightLabel.Position = UDim2.fromScale(0.02, 0.30)
@@ -448,7 +485,6 @@ local function createMenu()
 	heightDown.Size = UDim2.fromScale(0.1, 0.06)
 	heightDown.Position = UDim2.fromScale(0.78, 0.38)
 	heightDown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	heightDown.TextColor3 = Color3.fromRGB(200, 200, 200)
 	heightDown.Parent = bg
 	heightDown.MouseButton1Click:Connect(function()
 		config.offsetY = math.clamp(config.offsetY - 0.2, 1.5, 10.0)
@@ -463,7 +499,6 @@ local function createMenu()
 	heightUp.Size = UDim2.fromScale(0.1, 0.06)
 	heightUp.Position = UDim2.fromScale(0.88, 0.38)
 	heightUp.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	heightUp.TextColor3 = Color3.fromRGB(200, 200, 200)
 	heightUp.Parent = bg
 	heightUp.MouseButton1Click:Connect(function()
 		config.offsetY = math.clamp(config.offsetY + 0.2, 1.5, 10.0)
@@ -485,7 +520,6 @@ local function createMenu()
 		text.Size = UDim2.fromScale(0.75, 1)
 		text.Position = UDim2.fromScale(0, 0)
 		text.BackgroundTransparency = 1
-		text.TextColor3 = Color3.fromRGB(220, 220, 220)
 		text.TextXAlignment = Enum.TextXAlignment.Left
 		text.Parent = frame
 
@@ -505,7 +539,6 @@ local function createMenu()
 			refreshAll()
 			resetIdleTimer()
 		end)
-		return frame
 	end
 
 	makeToggle("Avatar", 0.42, function() return config.showAvatar end, function(v) config.showAvatar = v end)
@@ -513,18 +546,26 @@ local function createMenu()
 	makeToggle("Health", 0.58, function() return config.showHealth end, function(v) config.showHealth = v end)
 
 	local closeBtn = Instance.new("TextButton")
+	closeBtn.Name = "CloseButton"
 	closeBtn.Text = "× Close"
-	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	closeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	closeBtn.Size = UDim2.fromScale(0.25, 0.07)
 	closeBtn.Position = UDim2.fromScale(0.73, 0.91)
 	closeBtn.Parent = bg
 	closeBtn.MouseButton1Click:Connect(hideMenu)
 
+	-- Обновляем цвет кнопки Close (только "×", не "Close")
+	closeBtn:GetPropertyChangedSignal("Text"):Connect(function()
+		-- Простой способ: перекрасим при создании
+		closeBtn.TextColor3 = bg.BorderColor3
+	end)
+	closeBtn.TextColor3 = bg.BorderColor3
+
 	resetIdleTimer()
 	menuVisible = true
 end
 
+-- Открытие/закрытие меню по U
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.U then
@@ -536,7 +577,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 end)
 
--- === ПОДПИСКИ ===
+-- Автообновление темы меню при смене команды
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+	if menuVisible then
+		task.delay(0.05, updateMenuTheme)
+	end
+end)
+
+-- === ПОДПИСКИ НА ИГРОКОВ ===
 local function onPlayerAdded(plr)
 	local function onCharacterAdded(char)
 		task.delay(0.1, function()
@@ -558,17 +606,19 @@ end
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(removeHighlight)
 
--- Для уже существующих
+-- Инициализация существующих игроков
 for _, plr in ipairs(Players:GetPlayers()) do
 	if plr ~= LocalPlayer then
 		onPlayerAdded(plr)
 		if plr.Character then
-			task.delay(0.1, function() if plr.Parent then refreshPlayer(plr) end end)
+			task.delay(0.1, function()
+				if plr.Parent then refreshPlayer(plr) end
+			end)
 		end
 	end
 end
 
--- Резерв
+-- Фолбэк-обновление
 task.spawn(function()
 	while task.wait(3) do
 		if config.enabled then
@@ -636,7 +686,6 @@ while wait(1) do
 		end
 	end
 end
-
 end)
 
 Section:NewButton("God Mode Beta", "Can Work on fire and other", function()
@@ -698,7 +747,8 @@ end
 end)
 
 Section:NewButton("Fast Interact", "Can fast open doors . heal peoples", function()
-while wait(0.001) do
+
+while wait(0.0001) do
 	for _, obj in ipairs(game.Workspace:GetDescendants()) do
 		if obj:IsA("ProximityPrompt") then
 			obj.HoldDuration = 0
