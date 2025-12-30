@@ -745,19 +745,101 @@ while wait(0.002) do
 	end
 end
 end)
-
 Section:NewButton("Fast Interact", "Can fast open doors . heal peoples", function()
-
-while wait(0.0001) do
+-- Минимальная нагрузка - только новые объекты
+game.Workspace.DescendantAdded:Connect(function(obj)
+	if obj:IsA("ProximityPrompt") then
+		obj.HoldDuration = 0
+	end
+end)
+task.spawn(function()
+	task.wait(3)
+	local count = 0
 	for _, obj in ipairs(game.Workspace:GetDescendants()) do
 		if obj:IsA("ProximityPrompt") then
 			obj.HoldDuration = 0
-			wait(0.001)
+			count = count + 1
 		end
-		
+	end
+end)
+end)
+
+Section:NewButton("Fast Interact Legit", "Can fast open doors . heal peoples", function()
+local RunService = game:GetService("RunService")
+local processedPrompts = {}
+local function getPromptId(prompt)
+	local parent = prompt.Parent
+	if not parent then return nil end
+	local position = parent:IsA("BasePart") and parent.Position or parent:GetPivot().Position
+	local x, y, z = math.floor(position.X), math.floor(position.Y), math.floor(position.Z)
+	return string.format("%s_%d_%d_%d", parent.Name, x, y, z)
+end
+local function processPrompt(prompt)
+	local promptId = getPromptId(prompt)
+	if promptId and not processedPrompts[promptId] then
+		if prompt.HoldDuration > 0 then
+			if not processedPrompts[promptId .. "_original"] then
+				processedPrompts[promptId .. "_original"] = prompt.HoldDuration
+			end
+			local originalDuration = processedPrompts[promptId .. "_original"]
+			local newDuration = math.max(originalDuration / 3, 0.1)
+			prompt.HoldDuration = newDuration
+			processedPrompts[promptId] = true
+		end
 	end
 end
+local function processPromptSimple(prompt)
+	if not prompt:GetAttribute("ProcessedByScript") then
+		if prompt.HoldDuration > 0 then
+			prompt:SetAttribute("OriginalHoldDuration", prompt.HoldDuration)
+			local newDuration = math.max(prompt.HoldDuration / 3, 0.1)
+			prompt.HoldDuration = newDuration
+			prompt:SetAttribute("ProcessedByScript", true)
+		end
+	else
+		local originalDuration = prompt:GetAttribute("OriginalHoldDuration")
+		if originalDuration then
+			prompt.HoldDuration = math.max(originalDuration / 3, 0.1)
+		end
+	end
+end
+game.Workspace.DescendantAdded:Connect(function(obj)
+	if obj:IsA("ProximityPrompt") then
+		processPromptSimple(obj)
+	end
 end)
+local checkInterval = 0.1
+local lastCheckTime = 0
+RunService.Heartbeat:Connect(function(deltaTime)
+	lastCheckTime = lastCheckTime + deltaTime
+	if lastCheckTime >= checkInterval then
+		for _, obj in ipairs(game.Workspace:GetDescendants()) do
+			if obj:IsA("ProximityPrompt") then
+				processPromptSimple(obj)
+			end
+		end
+		lastCheckTime = 0
+	end
+end)
+task.spawn(function()
+	task.wait(1)
+	local count = 0
+	for _, obj in ipairs(game.Workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			processPromptSimple(obj)
+			count = count + 1
+			if count % 50 == 0 then
+				task.wait(0.01)
+			end
+		end
+	end
+end)
+game.Workspace.DescendantRemoving:Connect(function(obj)
+	if obj:IsA("ProximityPrompt") then
+	end
+end)
+end)
+
 
 Section:NewButton("Auto Escape", "Work Every 120 secoonds auto", function()
 while wait(110) do
