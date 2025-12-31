@@ -49,12 +49,14 @@ Section:NewButton("Reset", "Glowing Players", function()
 player.Character.Humanoid.Health = 0
 end)
 
-Section:NewButton("Esp Presents", "Glowing Players", function()
-for i , obj in pairs(game.Workspace.ScavengerHunt:GetChildren()) do
-local p = Instance.new("Highlight")
-p.FillColor = Color3.fromRGB(255,0,0)
-p.OutlineColor = Color3.fromRGB(0,0,0)
-p.Parent = obj
+Section:NewButton("Esp Fireworks", "Glowing Players", function()
+for i, obj in pairs(game.Workspace:GetDescendants()) do
+    if string.find(obj.Name, "Firework") then
+        local p = Instance.new("Highlight")
+        p.FillColor = Color3.fromRGB(255, 0, 0)
+        p.OutlineColor = Color3.fromRGB(0, 0, 0)
+        p.Parent = obj
+    end
 end
 end)
 
